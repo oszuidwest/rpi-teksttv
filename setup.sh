@@ -1,4 +1,62 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# Set-up the functions library
+FUNCTIONS_LIB_PATH="/tmp/functions.sh"
+FUNCTIONS_LIB_URL="https://raw.githubusercontent.com/oszuidwest/bash-functions/main/common-functions.sh"
+
+# General Raspberry Pi configuration
+CONFIG_FILE_PATHS=("/boot/firmware/config.txt" "/boot/config.txt")
+FIRST_IP=$(hostname -I | awk '{print $1}')
+
+# Start with a clean terminal
+clear
+
+# Remove old functions library and download the latest version
+rm -f "$FUNCTIONS_LIB_PATH"
+if ! curl -s -o "$FUNCTIONS_LIB_PATH" "$FUNCTIONS_LIB_URL"; then
+  echo -e "*** Failed to download functions library. Please check your network connection! ***"
+  exit 1
+fi
+
+# Source the functions file
+# shellcheck source=/tmp/functions.sh
+source "$FUNCTIONS_LIB_PATH"
+
+# Set color variables
+set_colors
+
+# Check if running as root
+check_user_privileges normal
+
+# Check if this is Linux
+is_this_linux
+is_this_os_64bit
+
+# Check if we are running on a Raspberry Pi 4 or newer
+check_rpi_model 4
+
+# Timezone configuration
+set_timezone Europe/Amsterdam
+
+# Banner
+cat << "EOF"
+ ______   _ ___ ______        _______ ____ _____   _______     __
+|__  / | | |_ _|  _ \ \      / / ____/ ___|_   _| |_   _\ \   / /
+  / /| | | || || | | \ \ /\ / /|  _| \___ \ | |     | |  \ \ / / 
+ / /_| |_| || || |_| |\ V  V / | |___ ___) || |     | |   \ V /  
+/____|\___/|___|____/  \_/\_/  |_____|____/ |_|     |_|    \_/   
+EOF
+
+# Greeting
+echo -e "${GREEN}⎎ Raspberry Pi Kiosk set-up${NC}\n\n"
+ask_user "DO_UPDATES" "y" "Do you want to perform all OS updates? (y/n)" "y/n"
+
+# Update OS
+if [ "$DO_UPDATES" == "y" ]; then
+  update_os silent
+fi
+
+########## REFACTOR ONDERSTAANDE ################
 
 # Variables
 WALLPAPER_URL="https://raw.githubusercontent.com/oszuidwest/windows10-baseline/main/assets/ZWTV-wallpaper.png"
