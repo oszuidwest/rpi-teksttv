@@ -39,6 +39,7 @@ The script prompts for the following options during setup:
 | `CHROME_URL`     | `https://teksttv.zuidwest.cloud/zuidwest-1/`         | URL to display in Chromium kiosk mode                          |
 | `USE_DUAL_SCREEN`| `n`                                                  | Configure second HDMI output                                   |
 | `CHROME_URL_2`   | Same as `CHROME_URL`                                 | URL for second screen                                          |
+| `LIMITED_RGB`    | `n`                                                  | Use limited RGB color range (16-235); needed for SDI output    |
 
 ## Video and Boot Options
 
@@ -50,6 +51,20 @@ The script configures HDMI output at 1080i/50Hz with custom EDID data. These can
 | `BOOT_OPTIONS`   | `drm.edid_firmware=edid/edid.bin vc4.force_hotplug=0x01 consoleblank=1 logo.nologo`  |
 
 For dual screen setups, `video=HDMI-A-2:1920x1080@50D` is added automatically and `vc4.force_hotplug` is set to `0x03`.
+
+## Limited Color Range (SDI Output)
+
+Enable `LIMITED_RGB` when the HDMI output does not go straight to a TV or monitor, but through an **HDMI-to-SDI converter** (for example into a vMix production setup).
+
+By default the Pi outputs full-range RGB (0-255). SDI, however, is a legal/limited-range format (16-235, Rec. 709), and many HDMI-to-SDI converters assume the incoming HDMI signal is already limited range. Feeding them full-range RGB results in **crushed blacks and clipped/blown-out whites** — colors look wrong even though the source is fine.
+
+With `LIMITED_RGB=y` the script sets the DRM `Broadcast RGB` property to `Limited 16:235` on each HDMI output, so the signal matches what the SDI chain expects:
+
+```bash
+xrandr --output HDMI-1 --set "Broadcast RGB" "Limited 16:235"
+```
+
+Leave it at `n` for direct-to-display setups, where full range is correct.
 
 ## Architecture
 
