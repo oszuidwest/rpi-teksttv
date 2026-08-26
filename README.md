@@ -1,77 +1,78 @@
-# Raspberry Pi Text TV Setup
+# rpi-texttv
 
-This script configures a Raspberry Pi as a narrowcasting screen, displaying a webpage in full-screen Chromium with optional background audio via mpv.
+`rpi-texttv` turns a Raspberry Pi into a dedicated narrowcasting player. It starts Chromium full-screen on one or two HDMI outputs and can also run an audio stream through `mpv`.
 
-## Compatibility
+The installer uses a small X11/Openbox setup, so Raspberry Pi OS Lite is enough; a desktop image is not required.
 
-### Supported Models
-- **Raspberry Pi 4**
-- **Raspberry Pi 5**
-- **Raspberry Pi 400**
-- **Raspberry Pi 500**
+## Requirements
 
-Requires Raspberry Pi OS Trixie (64-bit) Lite. No full desktop environment needed — the script installs a lightweight X11 stack.
+- Raspberry Pi 4, 5, 400 or 500
+- Raspberry Pi OS Trixie (64-bit) Lite
+- An internet connection during installation
+- A regular user account with `sudo` access
 
-### Dual Screen Support
-All supported models have dual HDMI outputs. The script offers to configure both displays for simultaneous content display.
+The output is fixed at 1920×1080, 50 Hz interlaced. Make sure the connected display or video chain accepts 1080i50.
 
-### Cooling Fan (Pi 5 Only)
-The script automatically configures the active cooling fan: on at 55°C, off at 35°C, 100% speed.
+## Installation
 
-## Usage
-Install Raspberry Pi OS Trixie (64-bit) Lite and log in as a non-privileged user. Do not use `su` or `sudo`. Run:
+Log in as the regular user that will run the display, then run:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/oszuidwest/rpi-texttv/main/install.sh)"
 ```
 
-## Configuration Options
+Do not run the command through `sudo` or from a root shell. The installer asks for `sudo` itself when it needs to change system files.
 
-The script prompts for the following options during setup:
+The script installs the display software, configures console autologin and starts X11 automatically on `tty1`. It also changes the boot video settings, sets the timezone to `Europe/Amsterdam`, limits journald storage, removes CUPS and reboots the Pi when it is done.
 
-| Option           | Default                                              | Description                                                    |
-|------------------|------------------------------------------------------|----------------------------------------------------------------|
-| `DO_UPDATES`     | `y`                                                  | Perform OS updates during setup                                |
-| `INSTALL_VNC`    | `y`                                                  | Install RealVNC for remote desktop access (port 5900)          |
-| `INSTALL_MPV`    | `y`                                                  | Install mpv for background audio playback                      |
-| `MPV_URL`        | `https://icecast.zuidwest.cloud/zuidwest.stl`        | Audio stream URL for mpv                                       |
-| `MPV_VOLUME`     | `75`                                                 | Audio volume (0-100)                                           |
-| `CHROME_URL`     | `https://teksttv.zuidwest.cloud/zuidwest-1/`         | URL to display in Chromium kiosk mode                          |
-| `USE_DUAL_SCREEN`| `n`                                                  | Configure second HDMI output                                   |
-| `CHROME_URL_2`   | Same as `CHROME_URL`                                 | URL for second screen                                          |
-| `LIMITED_RGB`    | `n`                                                  | Use limited RGB color range (16-235); needed for SDI output    |
+## Installer settings
 
-## Video and Boot Options
+The installer asks these questions. Press Enter to accept the default.
 
-The script configures HDMI output at 1080i/50Hz with custom EDID data. These can be adjusted by editing the `VIDEO_OPTIONS` and `BOOT_OPTIONS` variables in the script:
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `DO_UPDATES` | `y` | Run a full OS upgrade before installing the display software |
+| `INSTALL_VNC` | `y` | Install and enable RealVNC for remote access |
+| `INSTALL_MPV` | `y` | Play a background audio stream with `mpv` |
+| `MPV_URL` | `https://icecast.zuidwest.cloud/zuidwest.stl` | Audio stream used by `mpv` |
+| `MPV_VOLUME` | `60` | Audio volume from 0 to 100 |
+| `CHROME_URL` | `https://teksttv.zuidwest.cloud/zuidwest-1/` | Page shown on the first display |
+| `USE_DUAL_SCREEN` | `n` | Enable the second HDMI output |
+| `CHROME_URL_2` | Same as `CHROME_URL` | Page shown on the second display |
+| `LIMITED_RGB` | `n` | Send limited-range RGB for an HDMI-to-SDI chain |
 
-| Variable         | Default                                                                              |
-|------------------|--------------------------------------------------------------------------------------|
-| `VIDEO_OPTIONS`  | `video=HDMI-A-1:1920x1080@50D`                                                      |
-| `BOOT_OPTIONS`   | `drm.edid_firmware=edid/edid.bin vc4.force_hotplug=0x01 consoleblank=1 logo.nologo`  |
+With two displays enabled, each screen gets its own Chromium instance. If audio is enabled, `mpv` runs as a systemd user service for each HDMI output and restarts automatically after a failure.
 
-For dual screen setups, `video=HDMI-A-2:1920x1080@50D` is added automatically and `vc4.force_hotplug` is set to `0x03`.
+## HDMI and SDI output
 
-## Limited Color Range (SDI Output)
-
-Enable `LIMITED_RGB` when the HDMI output does not go straight to a TV or monitor, but through an **HDMI-to-SDI converter** (for example into a vMix production setup).
-
-By default the Pi outputs full-range RGB (0-255). SDI, however, is a legal/limited-range format (16-235, Rec. 709), and many HDMI-to-SDI converters assume the incoming HDMI signal is already limited range. Feeding them full-range RGB results in **crushed blacks and clipped/blown-out whites** — colors look wrong even though the source is fine.
-
-With `LIMITED_RGB=y` the script sets the DRM `Broadcast RGB` property to `Limited 16:235` on each HDMI output, so the signal matches what the SDI chain expects:
+The installer forces 1080i50 in three places: the kernel command line, the supplied EDID file and an `xrandr` mode in the Openbox startup script. The relevant defaults in `install.sh` are:
 
 ```bash
-xrandr --output HDMI-1 --set "Broadcast RGB" "Limited 16:235"
+VIDEO_OPTIONS="video=HDMI-A-1:1920x1080@50D"
+BOOT_OPTIONS="drm.edid_firmware=edid/edid.bin vc4.force_hotplug=0x01 consoleblank=1 logo.nologo"
 ```
 
-Leave it at `n` for direct-to-display setups, where full range is correct.
+Enabling a second display adds the same mode for `HDMI-A-2` and changes `vc4.force_hotplug` to `0x03`.
 
-## Architecture
+Leave `LIMITED_RGB` disabled when the Pi is connected directly to a normal TV or monitor. Enable it when an HDMI-to-SDI converter expects video-range RGB (16–235). This prevents the converter from clipping highlights and shadows in a broadcast or vMix setup.
 
-The display stack: **X11 → Openbox → Chromium** (kiosk mode), with **feh** for wallpaper, **unclutter** to hide the cursor, and optionally **RealVNC** for remote access and **mpv** for audio. Dual screen runs two independent Chromium instances with separate user data directories.
+## What runs after boot
 
-## License
-MIT License. See [LICENSE](LICENSE).
+The display stack is X11, Openbox and Chromium. `feh` supplies a fallback background and `unclutter` hides the pointer. Chromium runs in kiosk and incognito mode with a separate profile directory for each screen.
+
+The chosen display settings are stored in `~/.config/openbox/display.conf`. Openbox starts everything from `~/.config/openbox/autostart` when the console user logs in.
+
+On Raspberry Pi 5 hardware, the installer also adds active-cooling settings that switch the fan on at 55 °C, off again at 35 °C and run it at full speed while active.
 
 ## Contributing
-Contributions welcome. Feel free to submit issues and pull requests.
+
+Bug reports and pull requests are welcome. Before submitting a shell change, run:
+
+```bash
+bash -n install.sh
+shellcheck install.sh
+```
+
+## License
+
+Released under the [MIT License](LICENSE).
