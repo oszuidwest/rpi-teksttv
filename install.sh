@@ -73,6 +73,11 @@ if [[ "$USE_DUAL_SCREEN" == "y" ]]; then
   BOOT_OPTIONS="${BOOT_OPTIONS/vc4.force_hotplug=0x01/vc4.force_hotplug=0x03}"
 fi
 
+# Limited RGB color range (16-235) instead of full range (0-255).
+# Required when feeding an HDMI-to-SDI converter (e.g. for vMix): SDI is
+# legal-range, so full-range RGB shows up with crushed blacks and clipped whites.
+prompt_user "LIMITED_RGB" "n" "Use limited color range (needed for SDI output)? (y/n)" "y/n"
+
 PI_MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "")
 
 # Configure host time settings
@@ -166,6 +171,7 @@ CHROME_URL_2="${CHROME_URL_2:-$CHROME_URL}"
 INSTALL_MPV="${INSTALL_MPV:-n}"
 MPV_URL="${MPV_URL:-}"
 MPV_VOLUME="${MPV_VOLUME:-60}"
+LIMITED_RGB="${LIMITED_RGB:-n}"
 EOF
 
 cat << 'EOF' > ~/.config/openbox/autostart
@@ -182,10 +188,16 @@ xrandr --newmode "1920x1080_50i" 74.25 1920 2448 2492 2640 1080 1084 1094 1125 i
 xrandr --addmode HDMI-1 "1920x1080_50i"
 xrandr --output HDMI-1 --mode "1920x1080_50i"
 
+# Use limited RGB range (16-235) when feeding an HDMI-to-SDI converter
+if [ "$LIMITED_RGB" = "y" ]; then
+  xrandr --output HDMI-1 --set "Broadcast RGB" "Limited 16:235"
+fi
+
 # Configure second display if enabled
 if [ "$USE_DUAL_SCREEN" = "y" ]; then
   xrandr --addmode HDMI-2 "1920x1080_50i" 2>/dev/null
   xrandr --output HDMI-2 --mode "1920x1080_50i" --right-of HDMI-1 2>/dev/null
+  [ "$LIMITED_RGB" = "y" ] && xrandr --output HDMI-2 --set "Broadcast RGB" "Limited 16:235" 2>/dev/null
 fi
 
 # Set wallpaper and hide cursor
